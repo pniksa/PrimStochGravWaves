@@ -1,3 +1,67 @@
+/*
+Here are the function and constants defined that are essential in the calculation
+At present we adjust the parameters in the code that is then compiled
+The units are chosen such that the pc = 1 and the c = 1 and the energy is typically expressed in eV
+The key parameters of interest for setting up different calculations are as follows:
+    Tini - the temperature at the phase transition in eV e.g. TQCD or TEW as defined below
+    bohi - the fraction of the Hubble scale
+
+    lagrangian - true:  lagrangian decorrelation rate is used
+                 false: eulerian decorrelation rate is used
+    compr - include compressibility effects (true)
+    puresweep - basic model for eulerian decorrelation rate (true) -> better set to false
+    magson - magnetosonic wave contribution to decorrelation rate
+    forcing - build up of the spectrum
+    forcing2 - proper decorrelation between build up and turbulent decay
+
+    initsf - initial relative fraction of dilatational energy (sound waves), 1-initsf corresponds to solenoidal energy
+    sfsf - is the fractional timescale in which the dilatational energy decays, the full time is then given by the inital eddy turnover time times sfsf
+    sfmodel - model for the decay of sound waves into vorticity: 0 no sound waves, 1 direct decay over time scaled with sfsf, 2 const, 3 const then decay
+
+    direc - directory where the result file is saved
+    fname - name of the result file to be written
+
+    dratech - corresponds to the choice of the decorrelation rate 0: gaussian, 1: caprini, 2: delta, 4: coherent
+    Omvir - initial turbulent energy (compressible)
+    Ombir - initial magnetic energy
+    hrate - true if helicity is non-zero
+    helbr - initial magnetic helicity ratio
+    helvr - initial vortical helicity ratio
+
+    kap - time evolution power law for energy spectra 1.3824;//0.843625;//0.26667 for 3 // 0.83304 for 2
+    kap2 - time evolution power law for integral scale 0.843625;//0.26667 for 3 // 0.83304 for 2
+    taubuild - buildup timescale for turbulence e.g. tauLini or fraction of hubble time
+    amax - maximal time for overall integration in general one Hubble time is usually enough e.g. aini*2.;//+abuild*3.0;//amaxn/ainin;
+    gamma1 - power law for integralscale cascade, 0.72 for max hel 0.4;//0.4;//0.31; 
+    gamma2 - power law for energy cascade, 0.56 for max hel, 1.2;//1.2;//1.38;
+    gamma1h - power law for integralscale cascade for helical scenarios, 2./3.;//0.72;
+    gamma2h- power law for integralscale cascade for helical scenarios, 2./3.;//0.667;//0.56;
+    gammab - buildup power law, e.g. linaer 1.0
+
+    initds - initial relative decay scale e.g. 1.0E-6*Lini;
+
+    Lc - norm of spectra has to be consistent with shape 5./12.;//11./6.//3./4. for 3; //norm. of spectra to L=1 initially // 1/2 for 2
+    Lc2 - norm. of spectra to L=1 initially for the dilatational spectrum 1./2.;//11./6.//3./4. for 3; // 1/2 for 2
+    Kolpot - Kol. law scaling for spectra 17./6.;//7./2. for 3 // 3 for 2
+    Kolpot2 - Kol. law scaling for dilatational spectra 3.;//7./2. for 3 // // 3 for 2
+    
+
+
+
+
+
+
+Below is also a list of used libraries 
+Note that the gsl library is required
+
+
+
+
+
+
+*/
+
+
 #include <iostream>
 #include <stdlib.h>
 #include <math.h>
@@ -21,6 +85,7 @@
 #include<limits>
 #include<gsl/gsl_sf_lambert.h>
 
+// depreacate / reworked
 /*//unit conversion
 const double sikm=2.99792458E5;
 const double pcikm=3.085677581E13; //pc is taken as unity scale
@@ -51,6 +116,7 @@ const double kgiGN=6.674E-11/(mega*sikm*sikm)*1.0E3*pcikm/GN;
 const double rhoc=3.*H0*H0/(8.0*pi*GN);
 const double Hsor=H0*sqrt(Omr);
 */
+
 const double KtoeV=8.621738E-5;
 //some factors
 const double pi=M_PI;
@@ -103,7 +169,7 @@ const bool simplyi=false;
 // Gaussian (false) or Exponantial cutoff (true)
 const bool altrate=false;
 // True for compressible turbulence
-const bool compr=false;
+const bool compr=true;
 // Pure sweeping effect according to Kraichnan 1965, alternatively (false) approximation due to Kaneda 1993
 const bool puresweep=false;
 // Magnetosonic wave impact on the decorrelation rate
@@ -111,14 +177,17 @@ const bool magson=false;
 // additional contribution for testing purposes regarding an changed decorrelation function that also takes sound wave oscillations into account -> keep false
 const bool addcon=false;
 // build up of the spectrum
-const bool forcing=false;
+const bool forcing=true;
 // decorrelation between linear build up and turbulent decay
 const bool forcing2=true;
 
 //compressibility spec.
+// initial fraction of sound waves energy relative to solenoidal energy 1-initsf
 const double initsf=0.;
+// sfsf indicates over how many Eddy turnover times the dilatational energy decays to solenoidal energy
 const double sfsf=1.;
-const int sfmodel=0; // 0 0, 1 direct decay, 2 const, 3 const then decay
+// decy types: model 0 has no sound waves i.e. incompressible
+const int sfmodel=1; // 0 0, 1 direct decay, 2 const, 3 const then decay
 
 //const bool altspec=true;
 
@@ -163,9 +232,9 @@ const double gamma2=1.2;//1.2;//1.38; //pow law for energy cascade, 0.56 for max
 const double gamma1h=2./3.;//0.72;
 const double gamma2h=2./3.;//0.667;//0.56;
 const double gammab=1.0; //buildup pow law
-const int Ngw=300;
-const double lgw=1.0E-5*(tpi/Lini);
-const double ugw=1.0E3*(tpi/Lini);
+const int Ngw=300; // number of resolved point
+const double lgw=1.0E-5*(tpi/Lini); // lowest resolved scale
+const double ugw=1.0E3*(tpi/Lini); // largest resolved scale
 const double initds=1.0E-6*Lini;
 //num parameters
 const double arr=1.0E-20;
@@ -186,20 +255,20 @@ const double infind=-2.0/3.0;//2.0;//4.0/3.0; //pow law ind for appr in inf for 
 const double infindlag=4.0/3.0;//2.0;//4.0/3.0; //pow law ind for appr in inf for inte
 const double lowbcoeff=0.0256479; //coeff for pow law at initial for inte
 const double initpow=0.;//7.0; //inital pow law for inte appr.     //////// now a factor k^2 is shifted
-const double min=1.0E-10;
-const double max=1.0E10;
+const double min=1.0E-10; // minimal relative scale
+const double max=1.0E10; // maximal relative scale
 const double fp=1.0E-15; //floating point prec
 const double errafa=1.0E-15;
 
-const double g0=3.36;
+const double g0=3.36; // effective degrees of freedom
 
 
-const double iabserr=1.0E-18;
+const double iabserr=1.0E-18; // absolute integration tolerance
 
 
-const double numtol=1.0E-18;
+const double numtol=1.0E-18; // numerical tolerance
 
-const double tomin=1.0E-50;
+const double tomin=1.0E-50; // mininmal value
 
 const double sltomin=sqrt(-log(tomin));
 //const double tomins=tomin*1.0E-5;
